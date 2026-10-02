@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import morgan from "morgan";
 import prisma from "./config/db.js";
+import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
 
@@ -39,5 +40,7 @@ app.get("/api/health", async (req, res) => {
         });
     }    
 });
+
+app.use("/api/auth", authRoutes);
 
 export default app;
