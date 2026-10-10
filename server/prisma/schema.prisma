@@ -13,6 +13,13 @@ enum ProjectRole {
   VIEWER
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
 model User {
   id                     Int     @id @default(autoincrement())
   username               String  @unique
@@ -24,9 +31,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  settings      UserSettings?
-  ownedProjects Project[]       @relation("ProjectOwner")
-  memberships   ProjectMember[]
+  settings            UserSettings?
+  ownedProjects       Project[]       @relation("ProjectOwner")
+  memberships         ProjectMember[]
+  sentInvitations     Invitation[]    @relation("InvitationSender")
+  receivedInvitations Invitation[]    @relation("InvitationReceiver")
 }
 
 model UserSettings {
@@ -52,8 +61,9 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members ProjectMember[]
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members     ProjectMember[]
+  invitations Invitation[]
 
   @@index([ownerId])
 }
@@ -70,4 +80,27 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@index([userId])
+}
+
+model Invitation {
+  id            Int              @id @default(autoincrement())
+  projectId     Int
+  invitedUserId Int
+  invitedById   Int
+  role          ProjectRole
+  status        InvitationStatus @default(PENDING)
+
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  invitedUser User @relation("InvitationReceiver", fields: [invitedUserId], references: [id], onDelete: Cascade)
+
+  invitedBy User @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([invitedUserId, status])
+  @@index([projectId, status])
+  @@index([expiresAt])
 }

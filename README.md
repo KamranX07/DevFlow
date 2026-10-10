@@ -9,3 +9,4 @@
 - [x] Project authorization
 - [x] Project listing
 - [x] Individual project access
+- [ ] Invitations
