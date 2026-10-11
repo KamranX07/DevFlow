@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import invitationRoutes from "./routes/invitation.routes.js";
 import taskRoutes from "./routes/task.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
 
 const app = express();
 
@@ -48,5 +49,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api", invitationRoutes);
 app.use("/api", taskRoutes);
+app.use("/api", commentRoutes);
 
 export default app;

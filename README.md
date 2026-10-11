@@ -2,3 +2,4 @@
 - [x] Project Management
 - [x] Invitation System
 - [x] Task Management
+- [x] Comments
