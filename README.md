@@ -1,12 +1,4 @@
-- [x] Neon PostgreSQL
-- [x] Prisma 7
-- [x] Express
 - [x] Authentication
-- [x] JWT + HTTP-only cookies
-- [x] User registration/login/logout
-- [x] Project creation
-- [x] Project membership
-- [x] Project authorization
-- [x] Project listing
-- [x] Individual project access
-- [x] Invitations
+- [x] Project Management
+- [x] Invitation System
+- [x] Task Management

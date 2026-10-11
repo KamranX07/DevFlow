@@ -20,6 +20,20 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model User {
   id                     Int     @id @default(autoincrement())
   username               String  @unique
@@ -31,11 +45,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  settings            UserSettings?
-  ownedProjects       Project[]       @relation("ProjectOwner")
-  memberships         ProjectMember[]
-  sentInvitations     Invitation[]    @relation("InvitationSender")
-  receivedInvitations Invitation[]    @relation("InvitationReceiver")
+  settings                UserSettings?
+  ownedProjects           Project[]       @relation("ProjectOwner")
+  memberships             ProjectMember[]
+  sentInvitations         Invitation[]    @relation("InvitationSender")
+  receivedInvitations     Invitation[]    @relation("InvitationReceiver")
+  createdTasks            Task[]          @relation("TaskCreator")
+  taskAssignees           TaskAssignee[]  @relation("TaskAssigneeUser")
+  assignedTaskAssignments TaskAssignee[]  @relation("TaskAssigneeBy")
 }
 
 model UserSettings {
@@ -64,6 +81,7 @@ model Project {
   owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
   members     ProjectMember[]
   invitations Invitation[]
+  tasks       Task[]
 
   @@index([ownerId])
 }
@@ -103,4 +121,43 @@ model Invitation {
   @@index([invitedUserId, status])
   @@index([projectId, status])
   @@index([expiresAt])
+}
+
+model Task {
+  id          Int          @id @default(autoincrement())
+  projectId   Int
+  createdById Int
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  deadline    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  assignees TaskAssignee[]
+
+  @@index([projectId, status])
+  @@index([projectId, priority])
+  @@index([deadline])
+}
+
+model TaskAssignee {
+  id           Int      @id @default(autoincrement())
+  taskId       Int
+  userId       Int
+  assignedById Int
+  assignedAt   DateTime @default(now())
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User @relation("TaskAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User @relation("TaskAssigneeBy", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  @@unique([taskId, userId])
+  @@index([userId])
 }
