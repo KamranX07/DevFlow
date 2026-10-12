@@ -3,3 +3,6 @@
 - [x] Invitation System
 - [x] Task Management
 - [x] Comments
+- [x] Activity Tracking
+- [ ] File Attachments
+- [ ] Notifications

@@ -3,6 +3,7 @@ import {
   createCommentSchema,
   updateCommentSchema,
 } from "../validators/comment.validator.js";
+import { recordActivity } from "../utils/activity.js";
 
 const parseId = (value) => {
   const id = Number(value);
@@ -59,16 +60,31 @@ export const createComment = async (req, res) => {
       });
     }
 
-    const comment = await prisma.comment.create({
-      data: {
+    const comment = await prisma.$transaction(async (tx) => {
+      const createdComment = await tx.comment.create({
+        data: {
+          taskId,
+          userId: req.user.id,
+          message: parsed.data.message,
+        },
+        include: {
+          user: commentAuthor,
+        },
+      });
+
+      await recordActivity(tx, {
+        projectId,
         taskId,
         userId: req.user.id,
-        message: parsed.data.message,
-      },
-      include: {
-        user: commentAuthor,
-      },
-    });
+        action: "COMMENT CREATED",
+        metadata: {
+          commentId: createdComment.id,
+        },
+      });
+
+      return createdComment;
+    })
+    
 
     return res.status(201).json({
       success: true,
@@ -186,14 +202,28 @@ export const updateComment = async (req, res) => {
       });
     }
 
-    const updated = await prisma.comment.update({
-      where: { id: commentId },
-      data: { message: parsed.data.message },
-      include: {
-        user: commentAuthor,
-      },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedComment = await tx.comment.update({
+        where: { id: commentId },
+        data: { message: parsed.data.message },
+        include: {
+          user: commentAuthor,
+        },
+      });
 
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "COMMENT_UPDATED",
+        metadata: {
+          commentId,
+        },
+      });
+
+      return updatedComment;
+    })
+    
     return res.status(200).json({
       success: true,
       message: "Comment updated successfully",
@@ -252,9 +282,21 @@ export const deleteComment = async (req, res) => {
       });
     }
 
-    await prisma.comment.delete({
-      where: { id: commentId },
-    });
+    await prisma.$transaction(async (tx) => {
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "COMMENT_DELETED",
+        metadata: {
+          commentId,
+        },
+      });
+
+      await tx.comment.delete({
+        where: { id: commentId },
+      });
+    });    
 
     return res.status(200).json({
       success: true,

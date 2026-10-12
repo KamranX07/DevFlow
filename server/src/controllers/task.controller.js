@@ -6,6 +6,7 @@ import {
   updateTaskStatusSchema,
   updateTaskAssigneesSchema,
 } from "../validators/task.validator.js";
+import { recordActivity } from "../utils/activity.js";
 
 const taskDetails = {
   createdBy: {
@@ -67,17 +68,32 @@ export const createTask = async (req, res) => {
 
     const { title, description, priority, deadline } = result.data;
 
-    const task = await prisma.task.create({
-      data: {
-        title,
-        description: description || null,
-        priority: priority ?? "MEDIUM",
-        deadline: deadline ? new Date(deadline) : null,
+    const task = await prisma.$transaction(async (tx) => {
+      const createdTask = await tx.task.create({
+        data: {
+          title,
+          description: description || null,
+          priority: priority ?? "MEDIUM",
+          deadline: deadline ? new Date(deadline) : null,
+          projectId,
+          createdById: req.user.id,
+        },
+        include: taskDetails,
+      });
+
+      await recordActivity(tx, {
         projectId,
-        createdById: req.user.id,
-      },
-      include: taskDetails,
-    });
+        taskId: createdTask.id,
+        userId: req.user.id,
+        action: "TASK_CREATED",
+        metadata: {
+          title: createdTask.title,
+          priority: createdTask.priority,
+        },
+      });
+
+      return createdTask;
+    })
 
     return res.status(201).json({
       success: true,
@@ -251,11 +267,25 @@ export const updateTask = async (req, res) => {
       data.deadline = data.deadline ? new Date(data.deadline) : null;
     }
 
-    const task = await prisma.task.update({
-      where: { id: taskId },
-      data,
-      include: taskDetails,
-    });
+    const task = await prisma.$transaction(async (tx) => {
+      const updatedTask = await tx.task.update({
+        where: { id: taskId },
+        data,
+        include: taskDetails,
+      });
+
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "TASK_UPDATED",
+        metadata: {
+          changedFields: Object.keys(data),
+        },
+      });
+
+      return updatedTask;
+    })
 
     return res.status(200).json({
       success: true,
@@ -340,31 +370,48 @@ export const updateTaskStatus = async (req, res) => {
 
     // Only update if the status is still the one we read.
     // This prevents a stale request from overwriting a concurrent change.
-    const updated = await prisma.task.updateMany({
-      where: {
-        id: taskId,
-        projectId,
-        status: task.status,
-      },
-      data: { status: newStatus },
-    });
+    const update = await prisma.$transaction(async (tx) => {
+      const updated = await tx.task.updateMany({
+        where: {
+          id: taskId,
+          projectId,
+          status: task.status,
+        },
+        data: { status: newStatus },
+      });
 
-    if (updated.count !== 1) {
+      if (updated.count !== 1) {
+        return null;
+      }
+
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "TASK_STATUS_CHANGED",
+        metadata: {
+          from: task.status,
+          to: newStatus,
+        },
+      });
+
+      return tx.task.findUnique({
+        where: { id: taskId },
+        include: taskDetails,
+      });
+    });
+    
+    if(!update) {
       return res.status(409).json({
         success: false,
         message: "Task status changed concurrently. Refresh and try again.",
       });
     }
 
-    const updatedTask = await prisma.task.findUnique({
-      where: { id: taskId },
-      include: taskDetails,
-    });
-
     return res.status(200).json({
       success: true,
       message: `Task moved to ${newStatus}`,
-      task: updatedTask,
+      task: update,
     });
   } catch (error) {
     console.error("Update task status error:", error);
@@ -444,6 +491,11 @@ export const updateTaskAssignees = async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
+      const currentAssignees = await tx.taskAssignee.findMany({
+        where: { taskId },
+        select: { userId: true },
+      });
+
       await tx.taskAssignee.deleteMany({
         where: { taskId },
       });
@@ -457,6 +509,17 @@ export const updateTaskAssignees = async (req, res) => {
           })),
         });
       }
+
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "TASK_ASSIGNEES_CHANGED",
+        metadata: {
+          previousUserIds: currentAssignees.map((item) => item.userId),
+          newUserIds: userIds,
+        },
+      });
     });
 
     const updatedTask = await prisma.task.findUnique({
@@ -499,11 +562,37 @@ export const deleteTask = async (req, res) => {
       });
     }
 
-    const deleted = await prisma.task.deleteMany({
-      where: { id: taskId, projectId },
+    const deleted = await prisma.$transaction(async (tx) => {
+      const task = await tx.task.findFirst({
+        where: { id: taskId, projectId },
+        select: {
+          id: true,
+          title: true,
+        },
+      });
+
+      if(!task) {
+        return false;
+      }
+
+      await recordActivity(tx, {
+        projectId,
+        taskId,
+        userId: req.user.id,
+        action: "TASK_DELETED",
+        metadata: {
+          title: task.title,
+        },
+      });
+
+      await tx.task.delete({
+        where: { id: taskId },
+      });
+
+      return true;
     });
 
-    if (deleted.count === 0) {
+    if (!deleted) {
       return res.status(404).json({
         success: false,
         message: "Task not found",
