@@ -1,5 +1,5 @@
 import prisma from "../config/db.js";
-
+import { createNotification } from "../utils/notification.js";
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -490,11 +490,26 @@ export const updateTaskAssignees = async (req, res) => {
       });
     }
 
-    await prisma.$transaction(async (tx) => {
+    const assigneeResult = await prisma.$transaction(async (tx) => {
       const currentAssignees = await tx.taskAssignee.findMany({
         where: { taskId },
         select: { userId: true },
       });
+
+      const previousUserIds = currentAssignees.map(
+        (assignee) => assignee.userId
+      );
+
+      const previousSet = new Set(previousUserIds);
+      const nextSet = new Set(userIds);
+
+      const addedUserIds = userIds.filter(
+        (userId) => !previousSet.has(userId)
+      );
+
+      const removedUserIds = previousUserIds.filter(
+        (userId) => !nextSet.has(userId)
+      );
 
       await tx.taskAssignee.deleteMany({
         where: { taskId },
@@ -510,6 +525,30 @@ export const updateTaskAssignees = async (req, res) => {
         });
       }
 
+      for (const userId of addedUserIds) {
+        if (userId === req.user.id) continue;
+
+        await createNotification(tx, {
+          userId,
+          type: "TASK_ASSIGNED",
+          message: `You have been assigned to task "${task.title}".`,
+          projectId,
+          taskId,
+        });
+      }
+      
+      for (const userId of removedUserIds) {
+        if (userId === req.user.id) continue;
+
+        await createNotification(tx, {
+          userId,
+          type: "TASK_UNASSIGNED",
+          message: `You have been unassigned from task "${task.title}".`,
+          projectId,
+          taskId,
+        });
+      }
+
       await recordActivity(tx, {
         projectId,
         taskId,
@@ -520,6 +559,11 @@ export const updateTaskAssignees = async (req, res) => {
           newUserIds: userIds,
         },
       });
+
+      return {
+        addedUserIds,
+        removedUserIds,
+      };
     });
 
     const updatedTask = await prisma.task.findUnique({
