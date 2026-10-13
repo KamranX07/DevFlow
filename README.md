@@ -6,3 +6,6 @@
 - [x] Activity Tracking
 - [x] File Attachments
 - [x] Notifications
+- [x] User Profile Settings
+- [ ] User Settings
+- [ ] Project Analytics
