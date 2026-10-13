@@ -1,6 +1,7 @@
 import { success } from "zod";
 import prisma from "../config/db.js";
 import { createInvitationSchema } from "../validators/invitation.validator.js";
+import { createNotification } from "../utils/notification.js";
 
 export const createInvitation = async (req, res) => {
     try {
@@ -80,7 +81,19 @@ export const createInvitation = async (req, res) => {
             Date.now() + 7 * 24 * 60 * 60 * 1000
         );
 
-        const invitation = await prisma.invitation.create({
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { name: true },
+        });
+
+        if(!project) {
+          return res.status(404).json({
+            message: "Project not found.",
+          });
+        }
+
+        const invite = await prisma.$transaction(async (tx) => {
+          const invitation = await prisma.invitation.create({
             data: {
                 projectId,
                 invitedUserId: invitedUser.id,
@@ -88,12 +101,23 @@ export const createInvitation = async (req, res) => {
                 role,
                 expiresAt,
             },
-        });
+          });
+
+          await createNotification(tx, {
+            userId: invitedUser.id,
+            type: "INVITATION_RECEIVED",
+            message: `You have been invited to join ${project.name}.`,
+            projectId,
+            invitationId: invitation.id,
+          });
+
+          return invitation;
+        })        
 
         return res.status(201).json({
             success: true,
             message: "Invitation sent successfully",
-            invitation,
+            invite,
         });
     } catch (error) {
         console.error("Create invitation error:", error);
@@ -272,6 +296,14 @@ export const acceptInvitation = async (req, res) => {
         throw new Error("Invitation changed during acceptance");
       }
 
+      await createNotification(tx, {
+        userId: invitation.invitedById,
+        type: "INVITATION_ACCEPTED",
+        message: `${req.user.username} accepted your project invitation.`,
+        projectId: invitation.projectId,
+        invitationId: invitation.id,
+      });
+
       return { invitation };
     });
 
@@ -378,6 +410,14 @@ export const rejectInvitation = async (req, res) => {
         message: "Invitation has already been processed",
       });
     }
+
+    await createNotification(tx, {
+      userId: invitation.invitedById,
+      type: "INVITATION_REJECTED",
+      message: `${req.user.username} rejected your project invitation.`,
+      projectId: invitation.projectId,
+      invitationId: invitation.id,
+    });
 
     return res.status(200).json({
       success: true,

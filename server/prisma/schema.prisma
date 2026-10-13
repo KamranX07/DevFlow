@@ -34,6 +34,16 @@ enum TaskPriority {
   URGENT
 }
 
+enum NotificationType {
+  INVITATION_RECEIVED
+  INVITATION_ACCEPTED
+  INVITATION_REJECTED
+  TASK_ASSIGNED
+  TASK_UNASSIGNED
+  TASK_STATUS_CHANGED
+  COMMENT_ADDED
+}
+
 model User {
   id                     Int     @id @default(autoincrement())
   username               String  @unique
@@ -56,6 +66,7 @@ model User {
   comments                Comment[]
   activities              Activity[]
   uploadedAttachments     Attachment[]    @relation("AttachmentUploader")
+  notifications           Notification[]
 }
 
 model UserSettings {
@@ -81,11 +92,12 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members     ProjectMember[]
-  invitations Invitation[]
-  tasks       Task[]
-  activities  Activity[]
+  owner         User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members       ProjectMember[]
+  invitations   Invitation[]
+  tasks         Task[]
+  activities    Activity[]
+  notifications Notification[]
 
   @@index([ownerId])
 }
@@ -122,6 +134,8 @@ model Invitation {
 
   invitedBy User @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
 
+  notifications Notification[]
+
   @@index([invitedUserId, status])
   @@index([projectId, status])
   @@index([expiresAt])
@@ -144,10 +158,11 @@ model Task {
 
   createdBy User @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
-  assignees   TaskAssignee[]
-  comments    Comment[]
-  activities  Activity[]
-  attachments Attachment[]
+  assignees     TaskAssignee[]
+  comments      Comment[]
+  activities    Activity[]
+  attachments   Attachment[]
+  notifications Notification[]
 
   @@index([projectId, status])
   @@index([projectId, priority])
@@ -219,4 +234,26 @@ model Attachment {
 
   @@index([taskId, createdAt])
   @@index([uploadedById])
+}
+
+model Notification {
+  id           Int              @id @default(autoincrement())
+  userId       Int
+  type         NotificationType
+  message      String           @db.VarChar(500)
+  projectId    Int?
+  taskId       Int?
+  invitationId Int?
+  isRead       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task       Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  invitation Invitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead, createdAt])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([invitationId])
 }
