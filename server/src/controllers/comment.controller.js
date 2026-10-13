@@ -4,6 +4,7 @@ import {
   updateCommentSchema,
 } from "../validators/comment.validator.js";
 import { recordActivity } from "../utils/activity.js";
+import { createNotification } from "../utils/notification.js";
 
 const parseId = (value) => {
   const id = Number(value);
@@ -72,6 +73,40 @@ export const createComment = async (req, res) => {
         },
       });
 
+      const taskDetails = await tx.task.findUnique({
+        where: { id: taskId },
+        select: {
+          createdById: true,
+          title: true,
+          assignees: {
+            select: {
+              userId: true,
+            },            
+          },
+        },
+      });
+
+      if(!taskDetails) {
+        throw new Error("TASK_NOT_FOUND");
+      }
+
+      const recipientIds = new Set([
+        taskDetails.createdById,
+        ...taskDetails.assignees.map((assignee) => assignee.userId),
+      ]);
+
+      for (const userId of recipientIds) {
+        if (userId === req.user.id) continue;
+
+        await createNotification(tx, {
+          userId,
+          type: "COMMENT_ADDED",
+          message: `${req.user.username} commented on task "${taskDetails.title}".`,
+          projectId,
+          taskId,
+        });
+      }
+
       await recordActivity(tx, {
         projectId,
         taskId,
@@ -85,7 +120,6 @@ export const createComment = async (req, res) => {
       return createdComment;
     })
     
-
     return res.status(201).json({
       success: true,
       message: "Comment added successfully",
