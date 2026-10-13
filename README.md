@@ -4,5 +4,5 @@
 - [x] Task Management
 - [x] Comments
 - [x] Activity Tracking
-- [ ] File Attachments
+- [x] File Attachments
 - [ ] Notifications

@@ -55,6 +55,7 @@ model User {
   assignedTaskAssignments TaskAssignee[]  @relation("TaskAssigneeBy")
   comments                Comment[]
   activities              Activity[]
+  uploadedAttachments     Attachment[]    @relation("AttachmentUploader")
 }
 
 model UserSettings {
@@ -143,9 +144,10 @@ model Task {
 
   createdBy User @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
-  assignees  TaskAssignee[]
-  comments   Comment[]
-  activities Activity[]
+  assignees   TaskAssignee[]
+  comments    Comment[]
+  activities  Activity[]
+  attachments Attachment[]
 
   @@index([projectId, status])
   @@index([projectId, priority])
@@ -198,4 +200,23 @@ model Activity {
   @@index([projectId, createdAt])
   @@index([taskId, createdAt])
   @@index([userId, createdAt])
+}
+
+model Attachment {
+  id              Int      @id @default(autoincrement())
+  taskId          Int
+  uploadedById    Int
+  fileName        String   @db.VarChar(255)
+  fileUrl         String   @db.Text
+  fileType        String   @db.VarChar(100)
+  fileSize        Int
+  storageProvider String   @default("CLOUDINARY")
+  storagePublicId String   @unique
+  createdAt       DateTime @default(now())
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt])
+  @@index([uploadedById])
 }

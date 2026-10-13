@@ -10,6 +10,7 @@ import invitationRoutes from "./routes/invitation.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
+import attachmentRoutes from "./routes/attachment.routes.js";
 
 const app = express();
 
@@ -52,5 +53,6 @@ app.use("/api", invitationRoutes);
 app.use("/api", taskRoutes);
 app.use("/api", commentRoutes);
 app.use("/api", activityRoutes);
+app.use("/api", attachmentRoutes);
 
 export default app;
