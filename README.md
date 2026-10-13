@@ -5,4 +5,4 @@
 - [x] Comments
 - [x] Activity Tracking
 - [x] File Attachments
-- [ ] Notifications
+- [x] Notifications
