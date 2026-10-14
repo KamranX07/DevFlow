@@ -7,5 +7,7 @@
 - [x] File Attachments
 - [x] Notifications
 - [x] User Profile Settings
-- [ ] User Settings
+- [x] User Settings & Preferences
 - [ ] Project Analytics
+- [ ] Backend Security & Regression Test
+- [ ] Frontend
