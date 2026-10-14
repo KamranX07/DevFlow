@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import morgan from "morgan";
+import { notFound, errorHandler } from "./middleware/error.middleware.js";
 import prisma from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
@@ -62,5 +63,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/users", settingsRoutes);
 app.use("/api", analyticsRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
 
 export default app;

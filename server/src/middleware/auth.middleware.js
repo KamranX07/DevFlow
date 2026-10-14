@@ -38,9 +38,17 @@ export const protect = async (req, res, next) => {
 
         next();
     } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid or expired authentication token",
-        });
+        if (
+            error.name === "JsonWebTokenError" ||
+            error.name === "TokenExpiredError" ||
+            error.name === "NotBeforeError"
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid or expired authentication token",
+            });
+        }
+        
+        return next(error);
     }
 };
