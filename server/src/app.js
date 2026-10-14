@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import morgan from "morgan";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
+import { apiLimiter } from "./middleware/rate-limit.middleware.js";
 import prisma from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
@@ -27,6 +28,8 @@ app.use(
         credentials: true,
     })
 );
+
+app.use(apiLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
