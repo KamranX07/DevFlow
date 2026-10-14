@@ -14,6 +14,7 @@ import attachmentRoutes from "./routes/attachment.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import settingsRoutes from "./routes/settings.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
 
 const app = express();
 
@@ -60,5 +61,6 @@ app.use("/api", attachmentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/users", settingsRoutes);
+app.use("/api", analyticsRoutes);
 
 export default app;

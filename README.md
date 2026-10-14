@@ -8,6 +8,6 @@
 - [x] Notifications
 - [x] User Profile Settings
 - [x] User Settings & Preferences
-- [ ] Project Analytics
+- [x] Project Analytics
 - [ ] Backend Security & Regression Test
 - [ ] Frontend
