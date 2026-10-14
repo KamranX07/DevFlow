@@ -2,13 +2,62 @@ import cloudinary from "../config/cloudinary.js";
 import { Readable } from "node:stream";
 import prisma from "../config/db.js";
 import { recordActivity } from "../utils/activity.js";
+import { fileTypeFromBuffer } from "file-type";
+
+const validateAttachmentContent = async (file) => {
+  const detected = await fileTypeFromBuffer(file.buffer);
+
+  const allowedDetectedTypes = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+    "application/zip",
+  ]);
+
+  // Binary formats must match their detected signature.
+  if (detected && allowedDetectedTypes.has(detected.mime)) {
+    if (detected.mime !== "application/zip") {
+      return detected.mime === file.mimetype;
+    }
+
+    // ZIP-based office files also use ZIP signatures.
+    // Their internal structure needs separate validation.
+    return file.mimetype === "application/zip" ||
+      file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+
+  // Plain text and CSV usually have no detectable binary signature.
+  if (
+    file.mimetype !== "text/plain" &&
+    file.mimetype !== "text/csv"
+  ) {
+    return false;
+  }
+
+  const text = file.buffer.toString("utf8");
+
+  // Reject binary data and invalid UTF-8 replacement characters.
+  if (text.includes("\u0000") || text.includes("\uFFFD")) {
+    return false;
+  }
+
+  return true;
+};
 
 const uploadToCloudinary = (file, folder) =>
   new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
-        resource_type: "auto",
+        resource_type: file.mimetype.startsWith("image/")
+          ? "image"
+          : "raw",
         use_filename: false,
       },
       (error, result) => {
@@ -20,9 +69,9 @@ const uploadToCloudinary = (file, folder) =>
     Readable.from(file.buffer).pipe(stream);
   });
 
-const deleteFromCloudinary = (publicId) =>
+const deleteFromCloudinary = (publicId, resourceType) =>
   cloudinary.uploader.destroy(publicId, {
-    resource_type: "image",
+    resource_type: resourceType,
     invalidate: true,
   });
 
@@ -51,6 +100,14 @@ export const uploadAttachment = async (req, res, next) => {
 
     if (!req.file) {
       return res.status(400).json({ message: "Please select a file to upload." });
+    }
+
+    const contentIsValid = await validateAttachmentContent(req.file);
+
+    if(!contentIsValid) {
+      return res.status(400).json({
+        message: "File contents do not match a supported file type.",
+      })
     }
 
     if (!["ADMIN", "MEMBER"].includes(req.projectMembership.role)) {
@@ -110,7 +167,7 @@ export const uploadAttachment = async (req, res, next) => {
     if (uploadedFile?.public_id) {
       try {
         await cloudinary.uploader.destroy(uploadedFile.public_id, {
-          resource_type: uploadedFile.resource_type || "raw",
+          resource_type: uploadedFile.resource_type || (req.file.mimetype.startsWith("image/") ? "image" : "raw"),
           invalidate: true,
         });
       } catch (cleanupError) {
@@ -190,14 +247,13 @@ export const deleteAttachment = async (req, res, next) => {
 
     // Destroy the cloud file before deleting its database record.
     // If Cloudinary fails, retain the database record for a retry.
-    const cloudResult = await cloudinary.uploader.destroy(
+    const resourceType = attachment.fileType.startsWith("image/")
+      ? "image"
+      : "raw";
+
+    const cloudResult = await deleteFromCloudinary(
       attachment.storagePublicId,
-      {
-        resource_type: attachment.fileType.startsWith("image/")
-            ? "image"
-            : "raw",
-        invalidate: true,
-      }
+      resourceType
     );
 
     if (!["ok", "not found"].includes(cloudResult.result)) {

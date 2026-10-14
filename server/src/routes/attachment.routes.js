@@ -1,8 +1,8 @@
-
 import { Router } from "express";
 import { protect } from "../middleware/auth.middleware.js";
 import { requireProjectMember } from "../middleware/project.middleware.js";
 import { uploadSingleAttachment } from "../middleware/upload.middleware.js";
+import { handleUploadError } from "../middleware/upload-error.middleware.js";
 import {
   uploadAttachment,
   getTaskAttachments,
@@ -17,6 +17,7 @@ router.post(
   "/projects/:projectId/tasks/:taskId/attachments",
   requireProjectMember,
   uploadSingleAttachment,
+  handleUploadError,
   uploadAttachment
 );
 

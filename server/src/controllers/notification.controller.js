@@ -17,6 +17,24 @@ export const getNotifications = async (req, res, next) => {
             });
         }
 
+        if (cursor !== null) {
+            const cursorNotification = await prisma.notification.findFirst({
+                where: {
+                    id: cursor,
+                    userId,
+                },
+                select: {
+                    id: true,
+                },
+            });
+
+            if (!cursorNotification) {
+                return res.status(400).json({
+                    message: "Invalid cursor.",
+                });
+            }
+        }
+
         const notification = await prisma.notification.findMany({
             where: { userId },
             orderBy: [

@@ -246,6 +246,25 @@ export const getProjectActivityAnalytics = async (req, res, next) => {
         message: "Invalid cursor.",
       });
     }
+   
+    if (cursor !== null) {
+      const cursorActivity = await prisma.activity.findFirst({
+        where: {
+          id: cursor,
+          projectId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!cursorActivity) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
 
     const activities = await prisma.activity.findMany({
       where: { projectId },

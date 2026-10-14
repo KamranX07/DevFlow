@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
 import { apiLimiter } from "./middleware/rate-limit.middleware.js";
+import { csrfProtection } from "./middleware/csrf.middleware.js";
 import prisma from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import projectRoutes from "./routes/project.routes.js";
@@ -30,6 +31,7 @@ app.use(
 );
 
 app.use(apiLimiter);
+app.use(csrfProtection);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))

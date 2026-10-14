@@ -4,7 +4,7 @@ export const requireProjectAdmin = async (req, res, next) => {
     try {
         const projectId = Number(req.params.projectId);
 
-        if(!Number.isInteger(projectId)) {
+        if(!Number.isSafeInteger(projectId) || projectId <= 0) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid project ID",
@@ -51,7 +51,7 @@ export const requireProjectMember = async (req, res, next) => {
     try {
         const projectId = Number(req.params.projectId);
 
-        if(!Number.isSafeInteger(projectId)) {
+        if(!Number.isSafeInteger(projectId) || projectId <= 0) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid project ID",

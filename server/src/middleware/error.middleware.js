@@ -23,11 +23,15 @@ export const errorHandler = (err, req, res, next) => {
             ? err.statusCode
             : 500;
     
+    const isOperationalError = err.isOperational === true;
+
     return res.status(statusCode).json({
         success: false,
         message:
-            statusCode === 500
-                ? "Internal server error"
-                : err.message || "Request failed",
+            statusCode < 500 && isOperationalError
+                ? err.message
+                : statusCode === 404
+                    ? "Resource not found"
+                    : "Internal server error",
     });
 };

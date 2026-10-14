@@ -464,7 +464,7 @@ export const updateTaskAssignees = async (req, res) => {
 
     const task = await prisma.task.findFirst({
       where: { id: taskId, projectId },
-      select: { id: true },
+      select: { id: true, title: true },
     });
 
     if (!task) {

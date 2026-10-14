@@ -1,9 +1,6 @@
 import prisma from "../config/db.js";
 
 const preferenceByType = {
-    INVITATION_RECEIVED: "emailNotifications",
-    INVITATION_ACCEPTED: "emailNotifications",
-    INVITATION_REJECTED: "emailNotifications",
     TASK_ASSIGNED: "taskNotifications",
     TASK_UNASSIGNED: "taskNotifications",
     TASK_STATUS_CHANGED: "taskNotifications",
@@ -27,13 +24,15 @@ export const createNotification = async (
         throw new Error(`Unsupported notification type: ${type}`);
     }
 
-    const settings = await tx.userSettings.findUnique({
-        where: { userId },
-        select: { [preferenceField]: true },
-    });
+    if (preferenceField) {
+        const settings = await tx.userSettings.findUnique({
+            where: { userId },
+            select: { [preferenceField]: true },
+        });
 
-    if (settings &&  settings[preferenceField] === false) {
-        return null;
+        if (settings &&  settings[preferenceField] === false) {
+            return null;
+        }
     }
 
     return tx.notification.create({
