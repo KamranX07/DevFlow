@@ -18,6 +18,15 @@ import notificationRoutes from "./routes/notification.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import settingsRoutes from "./routes/settings.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
+import dotenv from "dotenv";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+
+dotenv.config({
+    path: path.resolve(testDir, "../.env.test"),
+});
 
 const app = express();
 

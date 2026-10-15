@@ -9,5 +9,5 @@
 - [x] User Profile Settings
 - [x] User Settings & Preferences
 - [x] Project Analytics
-- [ ] Backend Security & Regression Test
+- [x] Backend Security & Regression Test
 - [ ] Frontend
