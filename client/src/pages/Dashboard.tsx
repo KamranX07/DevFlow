@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/useAuth";
 import { getMyProjects, type Project } from "../api/projects";
+import { getProjectOverview } from "../api/analytics";
+import { getProjectActivity, type ProjectActivity } from "../api/activity";
 
 const navigation = [
   { label: "Overview", icon: "◫" },
@@ -15,6 +17,26 @@ const stats = [
   { label: "Completed", value: "—", detail: "Tasks finished", icon: "✓" },
 ];
 
+function formatActivityAction(action: string): string {
+  const descriptions: Record<string, string> = {
+    COMMENT_CREATED: "added a comment to",
+    COMMENT_UPDATED: "updated the comment in",
+    COMMENT_DELETED: "deleted a comment from",
+    TASK_ASSIGNEES_CHANGED: "updated the assignees for",
+    TASK_CREATED: "created a task",
+    TASK_UPDATED: "updated the task",
+    TASK_STATUS_CHANGED: "changed the status of",
+    TASK_DELETED: "deleted the task",
+    MEMBER_ADDED: "added a member to",
+    MEMBER_REMOVED: "removed a member from",
+    ATTACHMENT_UPLOADED: "uploaded an attachment in",
+    ATTACHMENT_DELETED: "deleted an attachment from",
+  };
+
+  return descriptions[action.toUpperCase()] ??
+    action.replaceAll("_", " ").toLowerCase();
+}
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState("Overview");
@@ -23,6 +45,13 @@ export default function Dashboard() {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState("");
   const [retryCount, setRetryCount] =useState(0);
+  const [openTasks, setOpenTasks] = useState<number | null>(null);
+  const [completedTasks, setCompletedTasks] = useState<number | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [activities, setActivities] = useState<ProjectActivity[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState(false);
+  const [activityRetry, setActivityRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -55,9 +84,136 @@ export default function Dashboard() {
     };
   }, [retryCount]);
 
-  const dashboardStats = stats.map((stat, index) =>
-    index === 0 ? { ...stat, value: String(projects.length) } : stat
-  );
+  useEffect(() => {
+    let active = true;
+
+    async function loadTaskStats() {
+      if (projectsLoading) return;
+
+      if (projects.length === 0) {
+        setOpenTasks(0);
+        setCompletedTasks(0);
+        return;
+      }
+
+      setAnalyticsLoading(true);
+
+      try {
+        const overviews = await Promise.all(
+          projects.map((project) => getProjectOverview(project.id))
+        );
+
+        const open = overviews.reduce(
+          (total, item) =>
+            total +
+            item.statusBreakdown.TODO +
+            item.statusBreakdown.IN_PROGRESS +
+            item.statusBreakdown.REVIEW,
+          0
+        );
+
+        const completed = overviews.reduce(
+          (total, item) => total + item.overview.completedTasks,
+          0
+        );
+
+        if (active) {
+          setOpenTasks(open);
+          setCompletedTasks(completed);
+        }
+      } catch (error) {
+        console.error("Failed to load task statistics:", error);
+
+        if (active) {
+          setOpenTasks(null);
+          setCompletedTasks(null);
+        }
+      } finally {
+        if (active) setAnalyticsLoading(false);
+      }
+    }
+
+    void loadTaskStats();
+
+    return () => {
+      active = false;
+    };
+  }, [projects, projectsLoading]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentActivity() {
+      if (projectsLoading) return;
+
+      if (projects.length === 0) {
+        setActivities([]);
+        setActivityError(false);
+        return;
+      }
+
+      setActivityLoading(true);
+      setActivityError(false);
+
+      try {
+        const results = await Promise.all(
+          projects.map((project) => getProjectActivity(project.id))
+        );
+
+        const recent = results
+          .flat()
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() -
+              new Date(a.createdAt).getTime()
+          )
+          .slice(0, 5);
+
+        if (active) setActivities(recent);
+      } catch (error) {
+        console.error("Failed to load recent activity:", error);
+
+        if (active) {
+          setActivities([]);
+          setActivityError(true);
+        }
+      } finally {
+        if (active) setActivityLoading(false);
+      }
+    }
+
+    void loadRecentActivity();
+
+    return () => {
+      active = false;
+    };
+  }, [projects, projectsLoading, activityRetry]);
+
+  const dashboardStats = stats.map((stat, index) => {
+    if (index === 0) {
+      return { ...stat, value: String(projects.length) };
+    }
+
+    if (index === 1) {
+      return {
+        ...stat,
+        value: analyticsLoading
+          ? "..."
+          : openTasks === null
+            ? "—"
+            : String(openTasks),
+      };
+    }
+
+    return {
+      ...stat,
+      value: analyticsLoading
+        ? "..."
+        : completedTasks === null
+          ? "—"
+          : String(completedTasks), 
+    };
+  });
 
   async function handleLogout() {
     try {
@@ -342,13 +498,61 @@ export default function Dashboard() {
                   <span className="mt-2 min-h-10 w-px flex-1 bg-white/10" />
                 </div>
                 <div className="pb-6">
-                  
-                  <p className="mt-1 text-xs leading-5 text-[#8B948B]">
-                    Project updates, task changes, and team activity will appear in this feed.
-                  </p>
-                  <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-[#657064]">
-                    Activity feed / awaiting data
-                  </p>
+                  {activityLoading ? (
+                    <p className="text-sm text-white/50">
+                      Loading recent activity...
+                    </p>
+                  ) : activityError ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-white/60">
+                        Couldn't load recent activity.
+                      </p>
+                      <button
+                        onClick={() => setActivityRetry((count) => count + 1)}
+                        className="text-sm text-[#C5F36B] hover:underline"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : activities.length === 0 ? (
+                    <p className="text-sm text-white/50">
+                      No recent activity yet. Updates will appear here as your team works.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {activities.map((activity) => (
+                        <div
+                          key={`${activity.projectId}-${activity.id}`}
+                          className="flex gap-3 border-b border-white/10 pb-4 last:border-0"
+                        >
+                          <div className="flex h-9 2-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm text-[#C5F36B]">
+                            {activity.user.username.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-white/85">
+                              <span className="font-medium text-white">
+                                {activity.user.username}
+                              </span>{" "}
+                              {formatActivityAction(activity.action)}
+                              {activity.task && (
+                                <>
+                                  {" "}·{" "}
+                                  <span className="text-white/70">
+                                    {activity.task.title}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+
+                            <p className="mt-1 text-xs text-white/40">
+                              {new Date(activity.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}                  
                 </div>
               </div>
             </article>

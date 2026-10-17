@@ -111,7 +111,7 @@ export const createComment = async (req, res) => {
         projectId,
         taskId,
         userId: req.user.id,
-        action: "COMMENT CREATED",
+        action: "COMMENT_CREATED",
         metadata: {
           commentId: createdComment.id,
         },
