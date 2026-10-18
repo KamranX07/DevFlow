@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../context/useAuth";
 import { getMyProjects, type Project } from "../api/projects";
 import { getProjectOverview } from "../api/analytics";
 import { getProjectActivity, type ProjectActivity } from "../api/activity";
+import { getProjectTasks, type Task } from "../api/tasks";
+import { useNavigate } from "react-router-dom";
 
 const navigation = [
   { label: "Overview", icon: "◫" },
@@ -38,6 +40,8 @@ function formatActivityAction(action: string): string {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
   const { user, logout } = useAuth();
   const [activeNav, setActiveNav] = useState("Overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -52,7 +56,12 @@ export default function Dashboard() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState(false);
   const [activityRetry, setActivityRetry] = useState(0);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState("");
+  const [taskRetryCount, setTaskRetryCount] = useState(0);
 
+  // Load Projects
   useEffect(() => {
     let active = true;
 
@@ -84,6 +93,7 @@ export default function Dashboard() {
     };
   }, [retryCount]);
 
+  // Load Tasks Analytics
   useEffect(() => {
     let active = true;
 
@@ -140,6 +150,7 @@ export default function Dashboard() {
     };
   }, [projects, projectsLoading]);
 
+  // Load Recent Activities
   useEffect(() => {
     let active = true;
 
@@ -189,6 +200,67 @@ export default function Dashboard() {
     };
   }, [projects, projectsLoading, activityRetry]);
 
+  // Load Tasks
+  useEffect(() => {
+    let active = true;
+
+    async function loadTasks() {
+      setTasksLoading(true);
+      setTasksError("");
+
+      try {
+        const results = await Promise.all(
+          projects.map((project) => getProjectTasks(project.id)),
+        );
+
+        if (active) {
+          setTasks(results.flat());
+        }
+      } catch (error) {
+        console.error("Failed to load dashboard tasks:", error);
+
+        if (active) {
+          setTasksError("Couldn't load your tasks. Please try again");
+        }
+      } finally {
+        if (active) {
+          setTasksLoading(false);
+        }
+      }
+    }
+
+    if (projectsLoading) return;
+
+    void loadTasks();
+
+    return () => {
+      active = false;
+    };
+  }, [projects, projectsLoading, taskRetryCount]);
+
+  const taskStats = [
+    {
+      label: "To Do",
+      status: "TODO",
+      count: tasks.filter((task) => task.status === "TODO").length,
+    },
+    {
+      label: "In Progress",
+      status: "IN_PROGRESS",
+      count: tasks.filter((task) => task.status === "IN_PROGRESS").length,
+    },
+    {
+      label: "In Review",
+      status: "REVIEW",
+      count: tasks.filter((task) => task.status === "REVIEW").length,
+    },
+    {
+      label: "Completed",
+      status: "DONE",
+      count: tasks.filter((task) => task.status === "DONE").length,
+    },
+  ]
+
   const dashboardStats = stats.map((stat, index) => {
     if (index === 0) {
       return { ...stat, value: String(projects.length) };
@@ -233,6 +305,7 @@ export default function Dashboard() {
         />
       )}
 
+      {/* NAVIGATION MENU */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/8 bg-[#171A18] p-5 transition-transform duration-200 md:translate-x-0 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -264,6 +337,16 @@ export default function Dashboard() {
                 onClick={() => {
                   setActiveNav(item.label);
                   setMobileMenuOpen(false);
+
+                  if (item.label === "Overview") {
+                    navigate("/dashboard");
+                  } else if (item.label === "My projects") {
+                    navigate("/projects");
+                  } else if (item.label === "My tasks") {
+                    navigate("/tasks");
+                  } else if (item.label === "Activity") {
+                    navigate("/activity");
+                  }
                 }}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                   activeNav === item.label
@@ -299,8 +382,11 @@ export default function Dashboard() {
       </aside>
 
       <div className="min-w-0 md:pl-64">
+
+        {/* HEADER */}
         <header className="sticky top-0 z-30 flex h-18 items-center justify-between border-b border-white/8 bg-[#111412]/90 px-4 backdrop-blur-xl sm:px-7 lg:px-10">
           <div className="flex items-center gap-3">
+            {/* MOBILE NAVIGATION MENU */}
             <button
               aria-label="Open navigation menu"
               onClick={() => setMobileMenuOpen(true)}
@@ -324,6 +410,7 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* MAIN */}
         <main className="mx-auto max-w-[1600px] px-4 py-8 sm:px-7 sm:py-10 lg:px-10">
           <section className="relative overflow-hidden rounded-3xl border border-white/9 bg-[#191E19] p-6 sm:p-9 lg:p-12">
             <div
@@ -364,6 +451,7 @@ export default function Dashboard() {
             </div>
           </section>
 
+          {/* DASHBOARD STATS */}
           <section className="mt-10">
             <div className="mb-5 flex items-end justify-between gap-3">
               <div>
@@ -406,6 +494,7 @@ export default function Dashboard() {
           </section>
 
           <section className="mt-8 grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_1fr]">
+          {/* PROJECTS */}
             <article className="min-2-0 rounded-2xl border border-white/8 bg-[#171A18] p-5 sm:p-7">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -484,6 +573,7 @@ export default function Dashboard() {
               )}
             </article>
 
+          {/* ACTIVITY */}
             <article className="rounded-2xl border border-white/8 bg-[#171A18] p-5 sm:p-7">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8B948B]">
                 The activity stream
@@ -558,6 +648,7 @@ export default function Dashboard() {
             </article>
           </section>
 
+          {/* FOOTER */}
           <footer className="mt-10 flex flex-col gap-2 border-t border-white/8 py-5 text-xs text-[#727B73] sm:flex-row sm:items-center sm:justify-between">
             <span>DevFlow — built for people who build.</span>
             <span className="font-mono">WORKSPACE / V1.0</span>
