@@ -68,7 +68,7 @@ export default function Projects() {
               <button
                 key={project.id}
                 onClick={() => navigate(`/projects/${project.id}`)}
-                className="rounded-2xl border border-white/10 bg-[#171A18] p-6 text-left transition hover:border-[#C5F36B]/50"
+                className="rounded-2xl cursor-pointer border border-white/10 bg-[#171A18] p-6 text-left transition hover:border-[#C5F36B]/50"
               >
                 <h2 className="text-lg font-semibold">{project.name}</h2>
 

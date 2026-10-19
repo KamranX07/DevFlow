@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/useAuth";
 import { getMyProjects, type Project } from "../api/projects";
 import { getProjectOverview } from "../api/analytics";
 import { getProjectActivity, type ProjectActivity } from "../api/activity";
-import { getProjectTasks, type Task } from "../api/tasks";
 import { useNavigate } from "react-router-dom";
 
 const navigation = [
@@ -56,10 +55,6 @@ export default function Dashboard() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState(false);
   const [activityRetry, setActivityRetry] = useState(0);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
-  const [tasksError, setTasksError] = useState("");
-  const [taskRetryCount, setTaskRetryCount] = useState(0);
 
   // Load Projects
   useEffect(() => {
@@ -200,67 +195,6 @@ export default function Dashboard() {
     };
   }, [projects, projectsLoading, activityRetry]);
 
-  // Load Tasks
-  useEffect(() => {
-    let active = true;
-
-    async function loadTasks() {
-      setTasksLoading(true);
-      setTasksError("");
-
-      try {
-        const results = await Promise.all(
-          projects.map((project) => getProjectTasks(project.id)),
-        );
-
-        if (active) {
-          setTasks(results.flat());
-        }
-      } catch (error) {
-        console.error("Failed to load dashboard tasks:", error);
-
-        if (active) {
-          setTasksError("Couldn't load your tasks. Please try again");
-        }
-      } finally {
-        if (active) {
-          setTasksLoading(false);
-        }
-      }
-    }
-
-    if (projectsLoading) return;
-
-    void loadTasks();
-
-    return () => {
-      active = false;
-    };
-  }, [projects, projectsLoading, taskRetryCount]);
-
-  const taskStats = [
-    {
-      label: "To Do",
-      status: "TODO",
-      count: tasks.filter((task) => task.status === "TODO").length,
-    },
-    {
-      label: "In Progress",
-      status: "IN_PROGRESS",
-      count: tasks.filter((task) => task.status === "IN_PROGRESS").length,
-    },
-    {
-      label: "In Review",
-      status: "REVIEW",
-      count: tasks.filter((task) => task.status === "REVIEW").length,
-    },
-    {
-      label: "Completed",
-      status: "DONE",
-      count: tasks.filter((task) => task.status === "DONE").length,
-    },
-  ]
-
   const dashboardStats = stats.map((stat, index) => {
     if (index === 0) {
       return { ...stat, value: String(projects.length) };
@@ -348,7 +282,7 @@ export default function Dashboard() {
                     navigate("/activity");
                   }
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                className={`flex w-full items-center cursor-pointer gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
                   activeNav === item.label
                     ? "bg-[#C5F36B]/10 font-semibold text-[#C5F36B]"
                     : "text-[#A5ADA4] hover:bg-white/5 hover:text-white"
@@ -374,7 +308,7 @@ export default function Dashboard() {
           <p className="mt-1 text-xs text-[#8B948B]">Your account</p>
           <button
             onClick={handleLogout}
-            className="mt-4 w-full rounded-lg border border-white/10 px-3 py-2 text-sm text-[#B8C0B6] transition hover:border-[#C5F36B]/40 hover:text-[#C5F36B]"
+            className="mt-4 w-full cursor-pointer rounded-lg border border-white/10 px-3 py-2 text-sm text-[#B8C0B6] transition hover:border-[#C5F36B]/40 hover:text-[#C5F36B]"
           >
             Sign out ↗
           </button>
@@ -404,7 +338,7 @@ export default function Dashboard() {
               <span className="h-1.5 w-1.5 rounded-full bg-[#C5F36B]" />
               Workspace ready
             </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C5F36B]/30 bg-[#C5F36B]/10 text-sm font-bold text-[#C5F36B]">
+            <div className="flex h-9 w-9 items-center justify-center cursor-pointer rounded-full border border-[#C5F36B]/30 bg-[#C5F36B]/10 text-sm font-bold text-[#C5F36B]">
               {user?.username?.charAt(0).toUpperCase() ?? "D"}
             </div>
           </div>
@@ -438,7 +372,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setActiveNav("My projects")}
-                className="mt-7 inline-flex items-center gap-3 rounded-xl bg-[#C5F36B] px-5 py-3 text-sm font-bold text-[#111412] transition hover:bg-[#D5FF83] focus:outline-none focus:ring-2 focus:ring-[#C5F36B] focus:ring-offset-2 focus:ring-offset-[#191E19]"
+                className="mt-7 inline-flex items-center cursor-pointer gap-3 rounded-xl bg-[#C5F36B] px-5 py-3 text-sm font-bold text-[#111412] transition hover:bg-[#D5FF83] focus:outline-none focus:ring-2 focus:ring-[#C5F36B] focus:ring-offset-2 focus:ring-offset-[#191E19]"
               >
                 Explore workspace <span className="text-lg">↗</span>
               </button>

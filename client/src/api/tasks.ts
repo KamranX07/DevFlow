@@ -41,3 +41,11 @@ export async function getProjectTasks(projectId: number): Promise<Task[]> {
 
     return response.data.tasks;
 }
+
+export async function getTaskById(projectId: number, taskId: number): Promise<Task> {
+    const response = await api.get<{ success: boolean; task: Task }>(
+        `/projects/${projectId}/tasks/${taskId}`
+    );
+
+    return response.data.task;
+}
